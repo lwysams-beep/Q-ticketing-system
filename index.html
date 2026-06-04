@@ -1,4 +1,4 @@
-<!-- 版本: 1.8 (後台安全及狀態同步優化版) -->
+<!-- 版本: 1.9 (加入動態輪候長度顯示) -->
 <!DOCTYPE html>
 <html lang="zh-HK">
 <head>
@@ -83,7 +83,7 @@
         .flashing { animation: flashEffect 0.5s ease-in-out 6; }
 
         .counter-select { 
-            font-size: 22px; padding: 12px 20px; margin-bottom: 20px; 
+            font-size: 22px; padding: 12px 20px; margin-bottom: 10px; 
             border-radius: 10px; border: 2px solid #ccc; width: 100%; max-width: 300px;
             font-family: inherit; outline: none;
         }
@@ -104,11 +104,10 @@
 
     <!-- 主選單 -->
     <div id="page-menu" class="page active-page">
-        <h2 style="color: #666; margin-bottom: 30px;">請選擇功能 (版本 1.8)</h2>
+        <h2 style="color: #666; margin-bottom: 30px;">請選擇功能 (版本 1.9)</h2>
         <button class="menu-btn" onclick="showPage('page-issue')">🎟️ 1. 派發籌號 (201室)</button>
         <button class="menu-btn" onclick="showPage('page-counter')">👨‍🏫 2. 櫃位叫號 (202室)</button>
         <button class="menu-btn" onclick="showPage('page-screen')">📺 3. 等候區屏幕 (201室)</button>
-        <!-- 【更新】加入 tryAdminLogin() 密碼檢查 -->
         <button class="menu-btn" onclick="tryAdminLogin()" style="border-left-color: red;">⚙️ 4. 系統後台</button>
     </div>
 
@@ -171,8 +170,20 @@
                 <option value="C">櫃位 C</option>
                 <option value="D">櫃位 D</option>
             </select>
+
+            <!-- 【新增 1.9】 動態輪候長度顯示 -->
+            <div style="margin: 20px 0; padding: 15px; background-color: #f8f9fa; border-radius: 12px; text-align: left;">
+                <p style="font-size: 16px; color: #555; margin: 0 0 8px 0; font-weight: bold;">
+                    🚶‍♂️ 現場等候人數: <span id="queue-length-text" style="color: var(--danger-color); font-size: 22px;">0</span> 人
+                </p>
+                <!-- 視覺長度棒外框 -->
+                <div style="background-color: #e9ecef; border-radius: 10px; height: 16px; width: 100%; overflow: hidden;">
+                    <!-- 視覺長度棒填滿區塊 -->
+                    <div id="queue-length-bar" style="background-color: var(--primary-color); height: 100%; width: 0%; transition: all 0.5s ease-in-out;"></div>
+                </div>
+            </div>
             
-            <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;">
+            <hr style="border: 0; border-top: 1px solid #ddd; margin: 20px 0;">
             
             <p style="font-size: 18px; color: #555; margin: 0;">正在處理籌號：</p>
             <div id="counter-current-display" class="huge-text" style="font-size: 70px; margin: 10px 0;">-</div>
@@ -183,7 +194,7 @@
     </div>
 
     <script>
-        // Azure TTS 設定 (拆字防掃描版)
+        // Azure TTS 設定
         const keyPart1 = "4e9H1rk28tibm8UfqdSG";
         const keyPart2 = "0KTsw4qmzjoIq8hDryujrtej";
         const keyPart3 = "FWtcINrCJQQJ99CFAC3pKaRXJ3w3AAAYACOGZiCb";
@@ -212,35 +223,17 @@
             window.scrollTo(0, 0); 
         }
 
-        // ==========================================
-        // 【新增 1.8】 密碼檢查邏輯
-        // ==========================================
+        // 密碼檢查邏輯
         function tryAdminLogin() {
             const password = prompt("請輸入系統後台管理密碼：");
             if (password === "Bck54321") {
                 showPage('page-admin');
             } else if (password !== null) {
-                // 如果用戶沒有按取消，但密碼錯誤
                 alert("密碼錯誤，拒絕登入！");
             }
         }
 
-        // ==========================================
-        // 【新增 1.8】 監聽 Firebase 中記錄的最後重置時間
-        // ==========================================
-        db.ref('registration_day/status/lastResetTime').on('value', (snapshot) => {
-            const resetTime = snapshot.val();
-            const statusEl = document.getElementById('admin-status');
-            if(resetTime) {
-                statusEl.innerText = resetTime;
-            } else {
-                statusEl.innerText = "尚未有重置紀錄";
-            }
-        });
-
-        // ==========================================
-        // 【修改 1.8】 將重置時間寫入 Firebase
-        // ==========================================
+        // 後台邏輯與重置
         function resetSystem() {
             if(confirm("確定要將所有籌號與櫃位清零嗎？\n這將會重置所有老師及屏幕的畫面！")) {
                 const now = new Date();
@@ -251,7 +244,7 @@
                     status: { 
                         lastIssuedTicket: 0, 
                         lastCalledTicket: 0,
-                        lastResetTime: timeString // 寫入時間
+                        lastResetTime: timeString 
                     },
                     counters: {
                         A: { currentTicket: "-", triggerAlert: 0 },
@@ -263,11 +256,50 @@
             }
         }
 
-        // 派籌邏輯
-        db.ref('registration_day/status/lastIssuedTicket').on('value', (snapshot) => {
-            document.getElementById('current-issued-display').innerText = snapshot.val() || 0;
+        // ==========================================
+        // 【修改 1.9】 綜合監聽狀態：同時更新派籌數量及等候人數長度棒
+        // ==========================================
+        db.ref('registration_day/status').on('value', (snapshot) => {
+            const data = snapshot.val();
+            if(data) {
+                const issued = data.lastIssuedTicket || 0;
+                const called = data.lastCalledTicket || 0;
+                
+                // 1. 更新 201派籌區 及 後台的最後重置時間
+                document.getElementById('current-issued-display').innerText = issued;
+                if(data.lastResetTime) {
+                    document.getElementById('admin-status').innerText = data.lastResetTime;
+                } else {
+                    document.getElementById('admin-status').innerText = "尚未有重置紀錄";
+                }
+
+                // 2. 更新 202櫃位區 的等候人數及視線長度棒
+                // 計算等候人數 (不會是負數)
+                const waitingQueue = Math.max(0, issued - called);
+                const queueText = document.getElementById('queue-length-text');
+                const queueBar = document.getElementById('queue-length-bar');
+                
+                if(queueText && queueBar) {
+                    queueText.innerText = waitingQueue;
+                    
+                    // 設定視覺上限 (例如 40 人等候時進度棒為 100% 滿)
+                    const maxVisualQueue = 40; 
+                    const percent = Math.min(100, (waitingQueue / maxVisualQueue) * 100);
+                    queueBar.style.width = percent + '%';
+                    
+                    // 動態轉換顏色作視覺提示
+                    if(waitingQueue > 20) {
+                        queueBar.style.backgroundColor = "var(--danger-color)"; // 人多：紅色
+                    } else if(waitingQueue > 10) {
+                        queueBar.style.backgroundColor = "#fd7e14"; // 中等：橙色
+                    } else {
+                        queueBar.style.backgroundColor = "var(--primary-color)"; // 正常：深藍色
+                    }
+                }
+            }
         });
 
+        // 派發下一籌
         function issueNextTicket() {
             const statusRef = db.ref('registration_day/status');
             statusRef.once('value').then((snapshot) => {
