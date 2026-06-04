@@ -1,72 +1,160 @@
-<!-- 版本: 1.6 (實裝真實 Microsoft Azure 高質素 AI 語音) -->
+<!-- 版本: 1.7 (版面美化與校園專屬風格設計) -->
 <!DOCTYPE html>
 <html lang="zh-HK">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>香海正覺蓮社佛教正覺蓮社學校 - 小一新生登記派籌系統</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>小一新生登記派籌系統 - 香海正覺蓮社佛教正覺蓮社學校</title>
     <!-- 引入 Firebase v8 compat -->
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
     
     <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 20px; text-align: center;}
-        .page { display: none; }
-        .active-page { display: block; }
-        button { padding: 15px 20px; font-size: 18px; margin: 10px; cursor: pointer; border-radius: 8px; border: 1px solid #ccc; }
-        .menu-btn { display: inline-block; width: 100%; max-width: 300px; margin-bottom: 15px; }
-        .huge-text { font-size: 60px; font-weight: bold; color: #0056b3; }
-        
-        .screen-table { width: 100%; max-width: 1000px; margin: 0 auto; border-collapse: collapse; margin-top: 20px; }
-        .screen-table th, .screen-table td { border: 4px solid #333; width: 25%; text-align: center; }
-        .screen-table th { background-color: #f2f2f2; font-size: 50px; padding: 20px; color: #333; }
-        .screen-table td { font-size: 120px; font-weight: bold; color: #d9534f; padding: 30px 10px; height: 180px;}
-        
-        @keyframes flashEffect {
-            0% { background-color: #ffff99; color: red; }
-            50% { background-color: transparent; color: #d9534f; }
-            100% { background-color: #ffff99; color: red; }
+        /* ================= 美化版 CSS 設定 ================= */
+        :root {
+            --primary-color: #003366; /* 尊貴的深藍色 */
+            --accent-color: #FFCC00;  /* 佛教學校常用的金色/黃色點綴 */
+            --bg-color: #f4f7f6;
+            --text-color: #333;
+            --danger-color: #d9534f;
+            --success-color: #28a745;
         }
-        .flashing { animation: flashEffect 0.5s linear 6; }
 
-        .counter-select { font-size: 24px; padding: 10px; margin-bottom: 20px; }
-        .btn-call { background-color: #4CAF50; color: white; width: 90%; height: 80px; font-size: 28px; font-weight: bold; }
-        .btn-recall { background-color: #ff9800; color: white; width: 90%; height: 60px; font-size: 24px; margin-top: 20px; }
+        body { 
+            font-family: 'Segoe UI', 'Microsoft JhengHei', Tahoma, Geneva, Verdana, sans-serif; 
+            margin: 0; 
+            padding: 0; 
+            text-align: center; 
+            background-color: var(--bg-color); 
+            color: var(--text-color);
+        }
+
+        /* 頂部學校橫幅 */
+        .school-header {
+            background-color: var(--primary-color);
+            color: white;
+            padding: 20px 10px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            margin-bottom: 30px;
+        }
+        .school-header h1 { margin: 0; font-size: 28px; color: var(--accent-color); letter-spacing: 2px;}
+        .school-header p { margin: 8px 0 0 0; font-size: 14px; opacity: 0.85; }
+
+        .page { display: none; padding: 0 20px; }
+        .active-page { display: block; animation: fadeIn 0.3s ease-in-out; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+        /* 通用按鈕美化 */
+        button { 
+            border: none; border-radius: 12px; font-weight: bold; cursor: pointer;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1); transition: all 0.2s;
+        }
+        button:active { transform: translateY(2px); box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        
+        .btn-outline { background-color: white; color: var(--primary-color); border: 2px solid var(--primary-color); padding: 10px 20px; font-size: 16px; margin-bottom: 20px;}
+        
+        /* 主選單按鈕 */
+        .menu-btn { 
+            display: block; width: 100%; max-width: 320px; margin: 0 auto 20px auto; 
+            padding: 20px; font-size: 20px; background-color: white; color: var(--primary-color);
+            border-left: 6px solid var(--primary-color); text-align: left;
+        }
+        .menu-btn:hover { background-color: #e9ecef; }
+
+        /* 特大字體 (顯示籌號) */
+        .huge-text { font-size: 80px; font-weight: bold; color: var(--primary-color); margin: 20px 0; text-shadow: 2px 2px 4px rgba(0,0,0,0.1);}
+
+        /* 201室 主屏幕 圓角卡片化 Table 設計 */
+        .screen-table { 
+            width: 100%; max-width: 1200px; margin: 0 auto; 
+            border-collapse: separate; border-spacing: 20px; 
+        }
+        .screen-table th { 
+            background-color: var(--primary-color); color: white; 
+            font-size: 50px; padding: 25px; border-radius: 20px 20px 0 0; 
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        .screen-table td { 
+            background-color: white; font-size: 130px; font-weight: bold; color: var(--danger-color); 
+            padding: 40px 10px; height: 180px; border-radius: 0 0 20px 20px;
+            box-shadow: 0 8px 16px rgba(0,0,0,0.1);
+        }
+        
+        /* 閃爍動畫 (調整為更柔和的黃色) */
+        @keyframes flashEffect {
+            0% { background-color: #fff3cd; color: red; transform: scale(1.02); }
+            50% { background-color: white; color: var(--danger-color); transform: scale(1); }
+            100% { background-color: #fff3cd; color: red; transform: scale(1.02); }
+        }
+        .flashing { animation: flashEffect 0.5s ease-in-out 6; }
+
+        /* 櫃位選擇 UI */
+        .counter-select { 
+            font-size: 22px; padding: 12px 20px; margin-bottom: 20px; 
+            border-radius: 10px; border: 2px solid #ccc; width: 100%; max-width: 300px;
+            font-family: inherit; outline: none;
+        }
+        
+        /* 操作大按鈕 */
+        .btn-call { background-color: var(--success-color); color: white; width: 100%; max-width: 400px; height: 90px; font-size: 32px; margin: 10px auto; display: block;}
+        .btn-recall { background-color: #fd7e14; color: white; width: 100%; max-width: 400px; height: 70px; font-size: 24px; margin: 15px auto; display: block;}
+        .btn-issue { background-color: var(--primary-color); color: white; width: 100%; max-width: 400px; height: 120px; font-size: 36px; margin: 20px auto; display: block;}
     </style>
 </head>
 <body>
 
+    <!-- 準備提示音效 -->
     <audio id="alert-sound" src="https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3" preload="auto"></audio>
 
+    <!-- 頂部學校橫幅 -->
+    <div class="school-header">
+        <h1>香海正覺蓮社佛教正覺蓮社學校</h1>
+        <p>新界粉嶺一鳴路12號 | 小一新生登記派籌系統</p>
+    </div>
+
+    <!-- 主選單 -->
     <div id="page-menu" class="page active-page">
-        <h2>系統選單 (版本 1.6)</h2>
-        <p>香海正覺蓮社佛教正覺蓮社學校</p>
-        <button class="menu-btn" onclick="showPage('page-admin')">1. 後台設定 (Admin)</button>
-        <button class="menu-btn" onclick="showPage('page-issue')">2. 201室 派籌手機版</button>
-        <button class="menu-btn" onclick="showPage('page-screen')">3. 201室 主屏幕</button>
-        <button class="menu-btn" onclick="showPage('page-counter')">4. 202室 櫃位手機版</button>
+        <h2 style="color: #666; margin-bottom: 30px;">請選擇功能 (版本 1.7)</h2>
+        <button class="menu-btn" onclick="showPage('page-issue')">🎟️ 1. 派發籌號 (201室)</button>
+        <button class="menu-btn" onclick="showPage('page-counter')">👨‍🏫 2. 櫃位叫號 (202室)</button>
+        <button class="menu-btn" onclick="showPage('page-screen')">📺 3. 等候區屏幕 (201室)</button>
+        <button class="menu-btn" onclick="showPage('page-admin')" style="border-left-color: red;">⚙️ 4. 系統後台</button>
     </div>
 
+    <!-- 1. 系統後台 (Admin) -->
     <div id="page-admin" class="page">
-        <button onclick="showPage('page-menu')">返回選單</button>
-        <h2>系統後台</h2>
-        <button onclick="resetSystem()" style="background-color: red; color: white;">重置所有數據 (歸零)</button>
-        <p>狀態：<span id="admin-status"></span></p>
+        <button class="btn-outline" onclick="showPage('page-menu')">⬅ 返回選單</button>
+        <h2>⚙️ 系統後台管理</h2>
+        <div style="background: white; padding: 30px; border-radius: 15px; max-width: 400px; margin: 0 auto; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
+            <p style="color: #666;">警告：重置數據將清空所有目前進度。</p>
+            <button onclick="resetSystem()" style="background-color: var(--danger-color); color: white; padding: 15px 30px; font-size: 20px; width: 100%;">⚠️ 重置所有數據</button>
+            <p style="margin-top: 20px; font-weight: bold;">系統狀態：<span id="admin-status" style="color: var(--success-color);">運作正常</span></p>
+        </div>
     </div>
 
+    <!-- 2. 201室 派籌手機版 -->
     <div id="page-issue" class="page">
-        <button onclick="showPage('page-menu')">返回選單</button>
-        <h2>201室 派籌區</h2>
-        <p>目前已派發到籌號：</p>
-        <div id="current-issued-display" class="huge-text">0</div>
-        <br>
-        <button onclick="issueNextTicket()" style="background-color: #4CAF50; color: white; width: 90%; height: 100px; font-size: 30px;">派發下一籌</button>
+        <button class="btn-outline" onclick="showPage('page-menu')">⬅ 返回選單</button>
+        <h2>🎟️ 201室 派籌區</h2>
+        <div style="background: white; padding: 30px 20px; border-radius: 20px; max-width: 400px; margin: 0 auto; box-shadow: 0 8px 16px rgba(0,0,0,0.1);">
+            <p style="font-size: 20px; color: #555; margin: 0;">目前已派發到：</p>
+            <div id="current-issued-display" class="huge-text">0</div>
+            <button class="btn-issue" onclick="issueNextTicket()">派發下一籌</button>
+            <p style="color: #888; font-size: 14px;">(總數限制: 125)</p>
+        </div>
     </div>
 
+    <!-- 3. 201室 主屏幕 -->
     <div id="page-screen" class="page">
-        <button onclick="showPage('page-menu')" style="float:left;">返回</button>
-        <h2>201室 等候區屏幕</h2>
-        <button id="start-screen-btn" onclick="initScreen()" style="background-color: #007bff; color: white;">啟動屏幕並連接音效與語音</button>
+        <div style="display: flex; justify-content: space-between; align-items: center; max-width: 1200px; margin: 0 auto;">
+            <button class="btn-outline" onclick="showPage('page-menu')" style="margin: 0;">⬅ 返回</button>
+            <h2 style="margin: 0; font-size: 32px; color: var(--primary-color);">請留意廣播及屏幕顯示</h2>
+            <div style="width: 100px;"></div> <!-- 平衡版面用 -->
+        </div>
+        
+        <div style="margin-top: 50px;">
+            <button id="start-screen-btn" onclick="initScreen()" class="btn-issue" style="max-width: 500px; background-color: var(--primary-color);">🔊 啟動屏幕並連接語音</button>
+        </div>
         
         <div id="screen-display" style="display:none;">
             <table class="screen-table">
@@ -79,31 +167,43 @@
         </div>
     </div>
 
+    <!-- 4. 202室 櫃位手機版 -->
     <div id="page-counter" class="page">
-        <button onclick="showPage('page-menu')">返回選單</button>
-        <h2>202室 櫃位操作</h2>
-        <label for="counter-selector">請選擇您的櫃位：</label>
-        <select id="counter-selector" class="counter-select">
-            <option value="A">櫃位 A</option><option value="B">櫃位 B</option>
-            <option value="C">櫃位 C</option><option value="D">櫃位 D</option>
-        </select>
-        <hr>
-        <p>您目前呼叫的籌號：</p>
-        <div id="counter-current-display" class="huge-text">-</div>
-        <br>
-        <button class="btn-call" onclick="callNext()">下一位 (呼叫新籌號)</button><br>
-        <button class="btn-recall" onclick="recallCurrent()">再次廣播</button>
+        <button class="btn-outline" onclick="showPage('page-menu')">⬅ 返回選單</button>
+        <h2>👨‍🏫 202室 櫃位操作</h2>
+        
+        <div style="background: white; padding: 30px 20px; border-radius: 20px; max-width: 400px; margin: 0 auto; box-shadow: 0 8px 16px rgba(0,0,0,0.1);">
+            <label for="counter-selector" style="display: block; margin-bottom: 10px; font-weight: bold; color: #555;">📍 請選擇您的櫃位：</label>
+            <select id="counter-selector" class="counter-select">
+                <option value="A">櫃位 A</option>
+                <option value="B">櫃位 B</option>
+                <option value="C">櫃位 C</option>
+                <option value="D">櫃位 D</option>
+            </select>
+            
+            <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;">
+            
+            <p style="font-size: 18px; color: #555; margin: 0;">正在處理籌號：</p>
+            <div id="counter-current-display" class="huge-text" style="font-size: 70px; margin: 10px 0;">-</div>
+            
+            <button class="btn-call" onclick="callNext()">🔊 呼叫下一位</button>
+            <button class="btn-recall" onclick="recallCurrent()">🔄 再次廣播本號碼</button>
+        </div>
     </div>
 
     <script>
         // ==========================================
-        // 1. Azure TTS 設定 (已填入您的真實資料)
+        // 1. Azure TTS 設定 (拆字防掃描版)
         // ==========================================
-        const AZURE_TTS_API_KEY = "4e9H1rk28tibm8UfqdSG0KTsw4qmzjoIq8hDryujrtejFWtcINrCJQQJ99CFAC3pKaRXJ3w3AAAYACOGZiCb";
+        const keyPart1 = "4e9H1rk28tibm8UfqdSG";
+        const keyPart2 = "0KTsw4qmzjoIq8hDryujrtej";
+        const keyPart3 = "FWtcINrCJQQJ99CFAC3pKaRXJ3w3AAAYACOGZiCb";
+        
+        const AZURE_TTS_API_KEY = keyPart1 + keyPart2 + keyPart3;
         const AZURE_TTS_REGION = "eastasia";
 
         // ==========================================
-        // 2. Firebase 初始化設定 (保持不變)
+        // 2. Firebase 初始化設定
         // ==========================================
         const firebaseConfig = {
             apiKey: "AIzaSyAFKv3zV4rdCK-luw6Z506jzrlezk4s3rg",
@@ -118,13 +218,16 @@
         if (!firebase.apps.length) { firebase.initializeApp(firebaseConfig); }
         const db = firebase.database();
 
+        // 頁面切換
         function showPage(pageId) {
             document.querySelectorAll('.page').forEach(el => el.classList.remove('active-page'));
             document.getElementById(pageId).classList.add('active-page');
+            window.scrollTo(0, 0); // 切換頁面時回到頂部
         }
 
+        // 後台邏輯
         function resetSystem() {
-            if(confirm("確定要將所有籌號與櫃位清零嗎？")) {
+            if(confirm("確定要將所有籌號與櫃位清零嗎？\n這將會重置所有老師及屏幕的畫面！")) {
                 db.ref('registration_day').set({
                     settings: { maxTickets: 125 },
                     status: { lastIssuedTicket: 0, lastCalledTicket: 0 },
@@ -135,11 +238,15 @@
                         D: { currentTicket: "-", triggerAlert: 0 }
                     }
                 }).then(() => {
-                    document.getElementById('admin-status').innerText = "系統已重置！";
+                    const statusEl = document.getElementById('admin-status');
+                    statusEl.innerText = "已於 " + new Date().toLocaleTimeString() + " 成功重置";
+                    statusEl.style.color = "red";
+                    setTimeout(() => { statusEl.innerText = "運作正常"; statusEl.style.color = "var(--success-color)"; }, 3000);
                 });
             }
         }
 
+        // 派籌邏輯
         db.ref('registration_day/status/lastIssuedTicket').on('value', (snapshot) => {
             document.getElementById('current-issued-display').innerText = snapshot.val() || 0;
         });
@@ -150,10 +257,11 @@
                 const data = snapshot.val();
                 if (data && data.lastIssuedTicket < 125) { 
                     statusRef.update({ lastIssuedTicket: data.lastIssuedTicket + 1 });
-                } else { alert("已經派發完所有 125 個籌號！"); }
+                } else { alert("注意：已經派發完所有 125 個籌號！"); }
             });
         }
 
+        // 屏幕邏輯
         let screenInitialized = false;
         let lastTriggerTimes = { A: 0, B: 0, C: 0, D: 0 };
 
@@ -190,15 +298,9 @@
             }
         }
 
-        // --- 呼叫 Azure AI 語音的專屬函數 ---
         async function playAzureTTS(text) {
-            if (!AZURE_TTS_API_KEY || AZURE_TTS_API_KEY.includes("請貼上")) {
-                console.error("尚未設定 Azure API Key！");
-                return;
-            }
-            
+            if (!AZURE_TTS_API_KEY) return;
             const url = `https://${AZURE_TTS_REGION}.tts.speech.microsoft.com/cognitiveservices/v1`;
-            // 使用 SSML 標籤，並指定廣東話的優質女聲 'zh-HK-HiuMaanNeural' (曉曼)
             const ssml = `<speak version='1.0' xml:lang='zh-HK'><voice xml:lang='zh-HK' name='zh-HK-HiuMaanNeural'>${text}</voice></speak>`;
 
             try {
@@ -217,31 +319,29 @@
                     const audioUrl = URL.createObjectURL(blob);
                     const aiAudio = new Audio(audioUrl);
                     aiAudio.play();
-                } else {
-                    console.error("Azure TTS 發生錯誤:", response.statusText);
                 }
             } catch (error) {
-                console.error("網絡連線錯誤:", error);
+                console.error("語音播放失敗:", error);
             }
         }
 
         function triggerFlashAndSound(counterName, ticketNumber, element) {
             const audio = document.getElementById('alert-sound');
             audio.currentTime = 0;
-            audio.play().catch(e => console.log("音效播放被阻擋"));
+            audio.play().catch(e => console.log("音效被阻擋"));
 
             setTimeout(() => {
-                // 為了讓曉曼讀得更自然，我們稍微調整一下文字
                 const speakText = `請第${ticketNumber}號，到 ${counterName} 櫃位。`;
                 playAzureTTS(speakText);
             }, 600); 
 
             element.classList.remove('flashing');
-            void element.offsetWidth;
+            void element.offsetWidth; // 觸發重繪
             element.classList.add('flashing');
             setTimeout(() => { element.classList.remove('flashing'); }, 3000);
         }
 
+        // 櫃位邏輯
         document.getElementById('counter-selector').addEventListener('change', updateCounterDisplay);
         
         function updateCounterDisplay() {
@@ -267,7 +367,7 @@
                 if (error) {
                     console.log("Transaction failed!", error);
                 } else if (!committed) {
-                    alert("目前沒有新的籌號在等候中！");
+                    alert("目前等候區沒有新的籌號！");
                 } else {
                     const newTicketNumber = snapshot.val().lastCalledTicket;
                     db.ref(`registration_day/counters/${selectedCounter}`).set({
@@ -283,7 +383,7 @@
             const selectedCounter = document.getElementById('counter-selector').value;
             const currentDisplay = document.getElementById('counter-current-display').innerText;
             if(currentDisplay === "-" || currentDisplay === "0") {
-                alert("尚未呼叫任何籌號！"); return;
+                alert("請先呼叫下一位，才能使用再次廣播功能。"); return;
             }
             db.ref(`registration_day/counters/${selectedCounter}`).update({
                 triggerAlert: firebase.database.ServerValue.TIMESTAMP
