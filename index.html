@@ -1,4 +1,4 @@
-<!-- 版本: 1.3 -->
+<!-- 版本: 1.4 -->
 <!DOCTYPE html>
 <html lang="zh-HK">
 <head>
@@ -46,7 +46,7 @@
 
     <!-- 主選單 -->
     <div id="page-menu" class="page active-page">
-        <h2>系統選單 (版本 1.3)</h2>
+        <h2>系統選單 (版本 1.4)</h2>
         <p>香海正覺蓮社佛教正覺蓮社學校</p>
         <button class="menu-btn" onclick="showPage('page-admin')">1. 後台設定 (Admin)</button>
         <button class="menu-btn" onclick="showPage('page-issue')">2. 201室 派籌手機版</button>
@@ -76,7 +76,6 @@
     <div id="page-screen" class="page">
         <button onclick="showPage('page-menu')" style="float:left;">返回</button>
         <h2>201室 等候區屏幕</h2>
-        <!-- 必須由用戶點擊才能解鎖瀏覽器音效與語音限制 -->
         <button id="start-screen-btn" onclick="initScreen()" style="background-color: #007bff; color: white;">啟動屏幕並連接音效與語音</button>
         
         <div id="screen-display" style="display:none;">
@@ -141,7 +140,6 @@
             document.getElementById(pageId).classList.add('active-page');
         }
 
-        // ================== 後台邏輯 ==================
         function resetSystem() {
             if(confirm("確定要將所有籌號與櫃位清零嗎？")) {
                 db.ref('registration_day').set({
@@ -159,7 +157,6 @@
             }
         }
 
-        // ================== 201室 派籌邏輯 ==================
         db.ref('registration_day/status/lastIssuedTicket').on('value', (snapshot) => {
             const val = snapshot.val() || 0;
             document.getElementById('current-issued-display').innerText = val;
@@ -177,12 +174,10 @@
             });
         }
 
-        // ================== 201室 主屏幕邏輯 ==================
         let screenInitialized = false;
         let lastTriggerTimes = { A: 0, B: 0, C: 0, D: 0 };
 
         function initScreen() {
-            // 1. 解鎖提示音效
             const audio = document.getElementById('alert-sound');
             audio.volume = 0;
             audio.play().then(() => {
@@ -191,7 +186,6 @@
                 audio.volume = 1; 
             }).catch(e => console.log("音效解鎖失敗", e));
 
-            // 2. 解鎖 Web Speech API (語音廣播)
             if ('speechSynthesis' in window) {
                 const unlockSpeech = new SpeechSynthesisUtterance('');
                 window.speechSynthesis.speak(unlockSpeech);
@@ -215,7 +209,6 @@
 
                         if(data.triggerAlert > lastTriggerTimes[counter] && data.triggerAlert !== 0) {
                             lastTriggerTimes[counter] = data.triggerAlert;
-                            // 傳入櫃位名稱與籌號給觸發函數
                             triggerFlashAndSound(counter, data.currentTicket, tdElement);
                         }
                     });
@@ -225,26 +218,34 @@
         }
 
         function triggerFlashAndSound(counterName, ticketNumber, element) {
-            // 1. 播放「叮」提示音效
             const audio = document.getElementById('alert-sound');
             audio.currentTime = 0;
             audio.play().catch(e => console.log("音效播放被阻擋"));
 
-            // 2. 粵語語音廣播 (加點延遲，讓「叮」聲先響)
             setTimeout(() => {
                 if ('speechSynthesis' in window) {
-                    window.speechSynthesis.cancel(); // 停止上一段未說完的話，避免重疊
+                    window.speechSynthesis.cancel();
                     
-                    // 使用逗號斷句，令語音節奏更自然
-                    const speakText = `請，第，${ticketNumber}號，到，${counterName}櫃位。`;
+                    // 【版本1.4 更新】：發音字典 (針對廣東話引擎微調)
+                    const pronunciationMap = {
+                        'A': '誒',     // 避免讀成「阿」
+                        'B': '嗶',     // 增加咬字清晰度
+                        'C': '司',     // 增加咬字清晰度
+                        'D': '滴'      // 增加咬字清晰度
+                    };
+                    
+                    // 根據字典替換發音，如果沒有對應就用原來的字
+                    const spokenCounter = pronunciationMap[counterName] || counterName;
+                    
+                    // 稍微改變斷句結構，讓系統讀得更順暢
+                    const speakText = `請，第 ${ticketNumber} 號，到，${spokenCounter}，櫃位。`;
                     const utterance = new SpeechSynthesisUtterance(speakText);
-                    utterance.lang = 'zh-HK'; // 設定為香港粵語
-                    utterance.rate = 0.9;     // 語速稍慢，確保聽得清楚
+                    utterance.lang = 'zh-HK'; 
+                    utterance.rate = 0.9;     
                     window.speechSynthesis.speak(utterance);
                 }
-            }, 600); // 延遲 0.6 秒開始說話
+            }, 600); 
 
-            // 3. 閃爍動畫
             element.classList.remove('flashing');
             void element.offsetWidth;
             element.classList.add('flashing');
@@ -254,7 +255,6 @@
             }, 3000);
         }
 
-        // ================== 202室 櫃位操作邏輯 ==================
         document.getElementById('counter-selector').addEventListener('change', updateCounterDisplay);
         
         function updateCounterDisplay() {
