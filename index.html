@@ -1,0 +1,312 @@
+<!-- 版本: 1.3 -->
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>香海正覺蓮社佛教正覺蓮社學校 - 小一新生登記派籌系統</title>
+    <!-- 引入 Firebase v8 compat -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+    
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 20px; text-align: center;}
+        .page { display: none; }
+        .active-page { display: block; }
+        button { padding: 15px 20px; font-size: 18px; margin: 10px; cursor: pointer; border-radius: 8px; border: 1px solid #ccc; }
+        .menu-btn { display: inline-block; width: 100%; max-width: 300px; margin-bottom: 15px; }
+        .huge-text { font-size: 60px; font-weight: bold; color: #0056b3; }
+        
+        /* 201室 主屏幕 2x4 Table 設計 */
+        .screen-table { width: 100%; max-width: 1000px; margin: 0 auto; border-collapse: collapse; margin-top: 20px; }
+        .screen-table th, .screen-table td { border: 4px solid #333; width: 25%; text-align: center; }
+        .screen-table th { background-color: #f2f2f2; font-size: 50px; padding: 20px; color: #333; }
+        .screen-table td { font-size: 120px; font-weight: bold; color: #d9534f; padding: 30px 10px; height: 180px;}
+        
+        /* 閃爍動畫 */
+        @keyframes flashEffect {
+            0% { background-color: #ffff99; color: red; }
+            50% { background-color: transparent; color: #d9534f; }
+            100% { background-color: #ffff99; color: red; }
+        }
+        .flashing {
+            animation: flashEffect 0.5s linear 6; /* 閃爍 6 次 (共3秒) */
+        }
+
+        /* 櫃位選擇 UI */
+        .counter-select { font-size: 24px; padding: 10px; margin-bottom: 20px; }
+        .btn-call { background-color: #4CAF50; color: white; width: 90%; height: 80px; font-size: 28px; font-weight: bold; }
+        .btn-recall { background-color: #ff9800; color: white; width: 90%; height: 60px; font-size: 24px; margin-top: 20px; }
+    </style>
+</head>
+<body>
+
+    <!-- 準備提示音效 -->
+    <audio id="alert-sound" src="https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3" preload="auto"></audio>
+
+    <!-- 主選單 -->
+    <div id="page-menu" class="page active-page">
+        <h2>系統選單 (版本 1.3)</h2>
+        <p>香海正覺蓮社佛教正覺蓮社學校</p>
+        <button class="menu-btn" onclick="showPage('page-admin')">1. 後台設定 (Admin)</button>
+        <button class="menu-btn" onclick="showPage('page-issue')">2. 201室 派籌手機版</button>
+        <button class="menu-btn" onclick="showPage('page-screen')">3. 201室 主屏幕</button>
+        <button class="menu-btn" onclick="showPage('page-counter')">4. 202室 櫃位手機版</button>
+    </div>
+
+    <!-- 1. 後台設定 (Admin) -->
+    <div id="page-admin" class="page">
+        <button onclick="showPage('page-menu')">返回選單</button>
+        <h2>系統後台</h2>
+        <button onclick="resetSystem()" style="background-color: red; color: white;">重置所有數據 (歸零)</button>
+        <p>狀態：<span id="admin-status"></span></p>
+    </div>
+
+    <!-- 2. 201室 派籌手機版 -->
+    <div id="page-issue" class="page">
+        <button onclick="showPage('page-menu')">返回選單</button>
+        <h2>201室 派籌區</h2>
+        <p>目前已派發到籌號：</p>
+        <div id="current-issued-display" class="huge-text">0</div>
+        <br>
+        <button onclick="issueNextTicket()" style="background-color: #4CAF50; color: white; width: 90%; height: 100px; font-size: 30px;">派發下一籌</button>
+    </div>
+
+    <!-- 3. 201室 主屏幕 -->
+    <div id="page-screen" class="page">
+        <button onclick="showPage('page-menu')" style="float:left;">返回</button>
+        <h2>201室 等候區屏幕</h2>
+        <!-- 必須由用戶點擊才能解鎖瀏覽器音效與語音限制 -->
+        <button id="start-screen-btn" onclick="initScreen()" style="background-color: #007bff; color: white;">啟動屏幕並連接音效與語音</button>
+        
+        <div id="screen-display" style="display:none;">
+            <table class="screen-table">
+                <tr>
+                    <th>A</th>
+                    <th>B</th>
+                    <th>C</th>
+                    <th>D</th>
+                </tr>
+                <tr>
+                    <td id="screen-A">-</td>
+                    <td id="screen-B">-</td>
+                    <td id="screen-C">-</td>
+                    <td id="screen-D">-</td>
+                </tr>
+            </table>
+        </div>
+    </div>
+
+    <!-- 4. 202室 櫃位手機版 -->
+    <div id="page-counter" class="page">
+        <button onclick="showPage('page-menu')">返回選單</button>
+        <h2>202室 櫃位操作</h2>
+        
+        <label for="counter-selector">請選擇您的櫃位：</label>
+        <select id="counter-selector" class="counter-select">
+            <option value="A">櫃位 A</option>
+            <option value="B">櫃位 B</option>
+            <option value="C">櫃位 C</option>
+            <option value="D">櫃位 D</option>
+        </select>
+        <hr>
+        <p>您目前呼叫的籌號：</p>
+        <div id="counter-current-display" class="huge-text">-</div>
+        
+        <br>
+        <button class="btn-call" onclick="callNext()">下一位 (呼叫新籌號)</button>
+        <br>
+        <button class="btn-recall" onclick="recallCurrent()">再次廣播</button>
+    </div>
+
+    <script>
+        // --- Firebase 初始化設定 ---
+        const firebaseConfig = {
+            apiKey: "AIzaSyAFKv3zV4rdCK-luw6Z506jzrlezk4s3rg",
+            authDomain: "q-ticketing-system.firebaseapp.com",
+            databaseURL: "https://q-ticketing-system-default-rtdb.asia-southeast1.firebasedatabase.app",
+            projectId: "q-ticketing-system",
+            storageBucket: "q-ticketing-system.firebasestorage.app",
+            messagingSenderId: "1008195336427",
+            appId: "1:1008195336427:web:d242c7b2c2cc5ff4d7e6ae"
+        };
+        
+        if (!firebase.apps.length) {
+            firebase.initializeApp(firebaseConfig);
+        }
+        const db = firebase.database();
+
+        function showPage(pageId) {
+            document.querySelectorAll('.page').forEach(el => el.classList.remove('active-page'));
+            document.getElementById(pageId).classList.add('active-page');
+        }
+
+        // ================== 後台邏輯 ==================
+        function resetSystem() {
+            if(confirm("確定要將所有籌號與櫃位清零嗎？")) {
+                db.ref('registration_day').set({
+                    settings: { maxTickets: 125 },
+                    status: { lastIssuedTicket: 0, lastCalledTicket: 0 },
+                    counters: {
+                        A: { currentTicket: "-", triggerAlert: 0 },
+                        B: { currentTicket: "-", triggerAlert: 0 },
+                        C: { currentTicket: "-", triggerAlert: 0 },
+                        D: { currentTicket: "-", triggerAlert: 0 }
+                    }
+                }).then(() => {
+                    document.getElementById('admin-status').innerText = "系統已於 " + new Date().toLocaleTimeString() + " 重置！";
+                });
+            }
+        }
+
+        // ================== 201室 派籌邏輯 ==================
+        db.ref('registration_day/status/lastIssuedTicket').on('value', (snapshot) => {
+            const val = snapshot.val() || 0;
+            document.getElementById('current-issued-display').innerText = val;
+        });
+
+        function issueNextTicket() {
+            const statusRef = db.ref('registration_day/status');
+            statusRef.once('value').then((snapshot) => {
+                const data = snapshot.val();
+                if (data && data.lastIssuedTicket < 125) { 
+                    statusRef.update({ lastIssuedTicket: data.lastIssuedTicket + 1 });
+                } else {
+                    alert("已經派發完所有 125 個籌號！");
+                }
+            });
+        }
+
+        // ================== 201室 主屏幕邏輯 ==================
+        let screenInitialized = false;
+        let lastTriggerTimes = { A: 0, B: 0, C: 0, D: 0 };
+
+        function initScreen() {
+            // 1. 解鎖提示音效
+            const audio = document.getElementById('alert-sound');
+            audio.volume = 0;
+            audio.play().then(() => {
+                audio.pause();
+                audio.currentTime = 0;
+                audio.volume = 1; 
+            }).catch(e => console.log("音效解鎖失敗", e));
+
+            // 2. 解鎖 Web Speech API (語音廣播)
+            if ('speechSynthesis' in window) {
+                const unlockSpeech = new SpeechSynthesisUtterance('');
+                window.speechSynthesis.speak(unlockSpeech);
+            }
+
+            document.getElementById('start-screen-btn').style.display = 'none';
+            document.getElementById('screen-display').style.display = 'block';
+            
+            if(!screenInitialized) {
+                db.ref('registration_day/counters').on('value', (snapshot) => {
+                    const countersData = snapshot.val();
+                    if(!countersData) return;
+
+                    ['A', 'B', 'C', 'D'].forEach(counter => {
+                        const data = countersData[counter];
+                        const tdElement = document.getElementById(`screen-${counter}`);
+                        
+                        if(tdElement.innerText !== data.currentTicket.toString()) {
+                            tdElement.innerText = data.currentTicket;
+                        }
+
+                        if(data.triggerAlert > lastTriggerTimes[counter] && data.triggerAlert !== 0) {
+                            lastTriggerTimes[counter] = data.triggerAlert;
+                            // 傳入櫃位名稱與籌號給觸發函數
+                            triggerFlashAndSound(counter, data.currentTicket, tdElement);
+                        }
+                    });
+                });
+                screenInitialized = true;
+            }
+        }
+
+        function triggerFlashAndSound(counterName, ticketNumber, element) {
+            // 1. 播放「叮」提示音效
+            const audio = document.getElementById('alert-sound');
+            audio.currentTime = 0;
+            audio.play().catch(e => console.log("音效播放被阻擋"));
+
+            // 2. 粵語語音廣播 (加點延遲，讓「叮」聲先響)
+            setTimeout(() => {
+                if ('speechSynthesis' in window) {
+                    window.speechSynthesis.cancel(); // 停止上一段未說完的話，避免重疊
+                    
+                    // 使用逗號斷句，令語音節奏更自然
+                    const speakText = `請，第，${ticketNumber}號，到，${counterName}櫃位。`;
+                    const utterance = new SpeechSynthesisUtterance(speakText);
+                    utterance.lang = 'zh-HK'; // 設定為香港粵語
+                    utterance.rate = 0.9;     // 語速稍慢，確保聽得清楚
+                    window.speechSynthesis.speak(utterance);
+                }
+            }, 600); // 延遲 0.6 秒開始說話
+
+            // 3. 閃爍動畫
+            element.classList.remove('flashing');
+            void element.offsetWidth;
+            element.classList.add('flashing');
+
+            setTimeout(() => {
+                element.classList.remove('flashing');
+            }, 3000);
+        }
+
+        // ================== 202室 櫃位操作邏輯 ==================
+        document.getElementById('counter-selector').addEventListener('change', updateCounterDisplay);
+        
+        function updateCounterDisplay() {
+            const selectedCounter = document.getElementById('counter-selector').value;
+            db.ref(`registration_day/counters/${selectedCounter}/currentTicket`).once('value', (snapshot) => {
+                document.getElementById('counter-current-display').innerText = snapshot.val() || "-";
+            });
+        }
+        updateCounterDisplay();
+
+        function callNext() {
+            const selectedCounter = document.getElementById('counter-selector').value;
+            const statusRef = db.ref('registration_day/status');
+            
+            statusRef.transaction((statusData) => {
+                if (statusData) {
+                    if (statusData.lastCalledTicket < statusData.lastIssuedTicket) {
+                        statusData.lastCalledTicket++;
+                    } else {
+                        return; 
+                    }
+                }
+                return statusData;
+            }, (error, committed, snapshot) => {
+                if (error) {
+                    console.log("Transaction failed!", error);
+                } else if (!committed) {
+                    alert("目前沒有新的籌號在等候中！");
+                } else {
+                    const newTicketNumber = snapshot.val().lastCalledTicket;
+                    db.ref(`registration_day/counters/${selectedCounter}`).set({
+                        currentTicket: newTicketNumber,
+                        triggerAlert: firebase.database.ServerValue.TIMESTAMP
+                    });
+                    document.getElementById('counter-current-display').innerText = newTicketNumber;
+                }
+            });
+        }
+
+        function recallCurrent() {
+            const selectedCounter = document.getElementById('counter-selector').value;
+            const currentDisplay = document.getElementById('counter-current-display').innerText;
+            
+            if(currentDisplay === "-" || currentDisplay === "0") {
+                alert("尚未呼叫任何籌號！");
+                return;
+            }
+            
+            db.ref(`registration_day/counters/${selectedCounter}`).update({
+                triggerAlert: firebase.database.ServerValue.TIMESTAMP
+            });
+        }
+    </script>
+</body>
+</html>
