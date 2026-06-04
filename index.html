@@ -1,4 +1,4 @@
-<!-- 版本: 1.7 (版面美化與校園專屬風格設計) -->
+<!-- 版本: 1.8 (後台安全及狀態同步優化版) -->
 <!DOCTYPE html>
 <html lang="zh-HK">
 <head>
@@ -12,8 +12,8 @@
     <style>
         /* ================= 美化版 CSS 設定 ================= */
         :root {
-            --primary-color: #003366; /* 尊貴的深藍色 */
-            --accent-color: #FFCC00;  /* 佛教學校常用的金色/黃色點綴 */
+            --primary-color: #003366; 
+            --accent-color: #FFCC00;  
             --bg-color: #f4f7f6;
             --text-color: #333;
             --danger-color: #d9534f;
@@ -29,7 +29,6 @@
             color: var(--text-color);
         }
 
-        /* 頂部學校橫幅 */
         .school-header {
             background-color: var(--primary-color);
             color: white;
@@ -44,7 +43,6 @@
         .active-page { display: block; animation: fadeIn 0.3s ease-in-out; }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 
-        /* 通用按鈕美化 */
         button { 
             border: none; border-radius: 12px; font-weight: bold; cursor: pointer;
             box-shadow: 0 4px 6px rgba(0,0,0,0.1); transition: all 0.2s;
@@ -53,7 +51,6 @@
         
         .btn-outline { background-color: white; color: var(--primary-color); border: 2px solid var(--primary-color); padding: 10px 20px; font-size: 16px; margin-bottom: 20px;}
         
-        /* 主選單按鈕 */
         .menu-btn { 
             display: block; width: 100%; max-width: 320px; margin: 0 auto 20px auto; 
             padding: 20px; font-size: 20px; background-color: white; color: var(--primary-color);
@@ -61,10 +58,8 @@
         }
         .menu-btn:hover { background-color: #e9ecef; }
 
-        /* 特大字體 (顯示籌號) */
         .huge-text { font-size: 80px; font-weight: bold; color: var(--primary-color); margin: 20px 0; text-shadow: 2px 2px 4px rgba(0,0,0,0.1);}
 
-        /* 201室 主屏幕 圓角卡片化 Table 設計 */
         .screen-table { 
             width: 100%; max-width: 1200px; margin: 0 auto; 
             border-collapse: separate; border-spacing: 20px; 
@@ -80,7 +75,6 @@
             box-shadow: 0 8px 16px rgba(0,0,0,0.1);
         }
         
-        /* 閃爍動畫 (調整為更柔和的黃色) */
         @keyframes flashEffect {
             0% { background-color: #fff3cd; color: red; transform: scale(1.02); }
             50% { background-color: white; color: var(--danger-color); transform: scale(1); }
@@ -88,14 +82,12 @@
         }
         .flashing { animation: flashEffect 0.5s ease-in-out 6; }
 
-        /* 櫃位選擇 UI */
         .counter-select { 
             font-size: 22px; padding: 12px 20px; margin-bottom: 20px; 
             border-radius: 10px; border: 2px solid #ccc; width: 100%; max-width: 300px;
             font-family: inherit; outline: none;
         }
         
-        /* 操作大按鈕 */
         .btn-call { background-color: var(--success-color); color: white; width: 100%; max-width: 400px; height: 90px; font-size: 32px; margin: 10px auto; display: block;}
         .btn-recall { background-color: #fd7e14; color: white; width: 100%; max-width: 400px; height: 70px; font-size: 24px; margin: 15px auto; display: block;}
         .btn-issue { background-color: var(--primary-color); color: white; width: 100%; max-width: 400px; height: 120px; font-size: 36px; margin: 20px auto; display: block;}
@@ -103,10 +95,8 @@
 </head>
 <body>
 
-    <!-- 準備提示音效 -->
     <audio id="alert-sound" src="https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3" preload="auto"></audio>
 
-    <!-- 頂部學校橫幅 -->
     <div class="school-header">
         <h1>香海正覺蓮社佛教正覺蓮社學校</h1>
         <p>新界粉嶺一鳴路12號 | 小一新生登記派籌系統</p>
@@ -114,11 +104,12 @@
 
     <!-- 主選單 -->
     <div id="page-menu" class="page active-page">
-        <h2 style="color: #666; margin-bottom: 30px;">請選擇功能 (版本 1.7)</h2>
+        <h2 style="color: #666; margin-bottom: 30px;">請選擇功能 (版本 1.8)</h2>
         <button class="menu-btn" onclick="showPage('page-issue')">🎟️ 1. 派發籌號 (201室)</button>
         <button class="menu-btn" onclick="showPage('page-counter')">👨‍🏫 2. 櫃位叫號 (202室)</button>
         <button class="menu-btn" onclick="showPage('page-screen')">📺 3. 等候區屏幕 (201室)</button>
-        <button class="menu-btn" onclick="showPage('page-admin')" style="border-left-color: red;">⚙️ 4. 系統後台</button>
+        <!-- 【更新】加入 tryAdminLogin() 密碼檢查 -->
+        <button class="menu-btn" onclick="tryAdminLogin()" style="border-left-color: red;">⚙️ 4. 系統後台</button>
     </div>
 
     <!-- 1. 系統後台 (Admin) -->
@@ -128,7 +119,7 @@
         <div style="background: white; padding: 30px; border-radius: 15px; max-width: 400px; margin: 0 auto; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
             <p style="color: #666;">警告：重置數據將清空所有目前進度。</p>
             <button onclick="resetSystem()" style="background-color: var(--danger-color); color: white; padding: 15px 30px; font-size: 20px; width: 100%;">⚠️ 重置所有數據</button>
-            <p style="margin-top: 20px; font-weight: bold;">系統狀態：<span id="admin-status" style="color: var(--success-color);">運作正常</span></p>
+            <p style="margin-top: 20px; font-weight: bold;">系統狀態：<br><span id="admin-status" style="color: var(--primary-color); display:inline-block; margin-top:10px;">讀取中...</span></p>
         </div>
     </div>
 
@@ -149,7 +140,7 @@
         <div style="display: flex; justify-content: space-between; align-items: center; max-width: 1200px; margin: 0 auto;">
             <button class="btn-outline" onclick="showPage('page-menu')" style="margin: 0;">⬅ 返回</button>
             <h2 style="margin: 0; font-size: 32px; color: var(--primary-color);">請留意廣播及屏幕顯示</h2>
-            <div style="width: 100px;"></div> <!-- 平衡版面用 -->
+            <div style="width: 100px;"></div> 
         </div>
         
         <div style="margin-top: 50px;">
@@ -192,9 +183,7 @@
     </div>
 
     <script>
-        // ==========================================
-        // 1. Azure TTS 設定 (拆字防掃描版)
-        // ==========================================
+        // Azure TTS 設定 (拆字防掃描版)
         const keyPart1 = "4e9H1rk28tibm8UfqdSG";
         const keyPart2 = "0KTsw4qmzjoIq8hDryujrtej";
         const keyPart3 = "FWtcINrCJQQJ99CFAC3pKaRXJ3w3AAAYACOGZiCb";
@@ -202,9 +191,7 @@
         const AZURE_TTS_API_KEY = keyPart1 + keyPart2 + keyPart3;
         const AZURE_TTS_REGION = "eastasia";
 
-        // ==========================================
-        // 2. Firebase 初始化設定
-        // ==========================================
+        // Firebase 初始化設定
         const firebaseConfig = {
             apiKey: "AIzaSyAFKv3zV4rdCK-luw6Z506jzrlezk4s3rg",
             authDomain: "q-ticketing-system.firebaseapp.com",
@@ -222,26 +209,56 @@
         function showPage(pageId) {
             document.querySelectorAll('.page').forEach(el => el.classList.remove('active-page'));
             document.getElementById(pageId).classList.add('active-page');
-            window.scrollTo(0, 0); // 切換頁面時回到頂部
+            window.scrollTo(0, 0); 
         }
 
-        // 後台邏輯
+        // ==========================================
+        // 【新增 1.8】 密碼檢查邏輯
+        // ==========================================
+        function tryAdminLogin() {
+            const password = prompt("請輸入系統後台管理密碼：");
+            if (password === "Bck54321") {
+                showPage('page-admin');
+            } else if (password !== null) {
+                // 如果用戶沒有按取消，但密碼錯誤
+                alert("密碼錯誤，拒絕登入！");
+            }
+        }
+
+        // ==========================================
+        // 【新增 1.8】 監聽 Firebase 中記錄的最後重置時間
+        // ==========================================
+        db.ref('registration_day/status/lastResetTime').on('value', (snapshot) => {
+            const resetTime = snapshot.val();
+            const statusEl = document.getElementById('admin-status');
+            if(resetTime) {
+                statusEl.innerText = resetTime;
+            } else {
+                statusEl.innerText = "尚未有重置紀錄";
+            }
+        });
+
+        // ==========================================
+        // 【修改 1.8】 將重置時間寫入 Firebase
+        // ==========================================
         function resetSystem() {
             if(confirm("確定要將所有籌號與櫃位清零嗎？\n這將會重置所有老師及屏幕的畫面！")) {
+                const now = new Date();
+                const timeString = "已於 " + now.toLocaleTimeString('zh-HK', { hour12: true }) + " 成功重置";
+                
                 db.ref('registration_day').set({
                     settings: { maxTickets: 125 },
-                    status: { lastIssuedTicket: 0, lastCalledTicket: 0 },
+                    status: { 
+                        lastIssuedTicket: 0, 
+                        lastCalledTicket: 0,
+                        lastResetTime: timeString // 寫入時間
+                    },
                     counters: {
                         A: { currentTicket: "-", triggerAlert: 0 },
                         B: { currentTicket: "-", triggerAlert: 0 },
                         C: { currentTicket: "-", triggerAlert: 0 },
                         D: { currentTicket: "-", triggerAlert: 0 }
                     }
-                }).then(() => {
-                    const statusEl = document.getElementById('admin-status');
-                    statusEl.innerText = "已於 " + new Date().toLocaleTimeString() + " 成功重置";
-                    statusEl.style.color = "red";
-                    setTimeout(() => { statusEl.innerText = "運作正常"; statusEl.style.color = "var(--success-color)"; }, 3000);
                 });
             }
         }
