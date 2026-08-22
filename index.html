@@ -1,14 +1,276 @@
-<!-- 版本: 1.9 (加入動態輪候長度顯示) -->
 <!DOCTYPE html>
 <html lang="zh-HK">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>小一新生登記派籌系統 - 香海正覺蓮社佛教正覺蓮社學校</title>
-    <!-- 引入 Firebase v8 compat -->
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
     
+    <!-- 【修正】引入 Firebase v9 模組化 SDK -->
+    <script type="module">
+        // 匯入所需的 Firebase v9 函式
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/9.10.0/firebase-app.js";
+        import { getDatabase, ref, onValue, set, update, get, serverTimestamp, runTransaction } from "https://www.gstatic.com/firebasejs/9.10.0/firebase-database.js";
+
+        // Azure TTS 設定 (不變)
+        const keyPart1 = "4e9H1rk28tibm8UfqdSG";
+        const keyPart2 = "0KTsw4qmzjoIq8hDryujrtej";
+        const keyPart3 = "FWtcINrCJQQJ99CFAC3pKaRXJ3w3AAAYACOGZiCb";
+        
+        const AZURE_TTS_API_KEY = keyPart1 + keyPart2 + keyPart3;
+        const AZURE_TTS_REGION = "eastasia";
+
+        // Firebase 初始化設定 (不變)
+        const firebaseConfig = {
+            apiKey: "AIzaSyAFKv3zV4rdCK-luw6Z506jzrlezk4s3rg",
+            authDomain: "q-ticketing-system.firebaseapp.com",
+            databaseURL: "https://q-ticketing-system-default-rtdb.asia-southeast1.firebasedatabase.app",
+            projectId: "q-ticketing-system",
+            storageBucket: "q-ticketing-system.firebasestorage.app",
+            messagingSenderId: "1008195336427",
+            appId: "1:1008195336427:web:d242c7b2c2cc5ff4d7e6ae"
+        };
+        
+        // 【修正】使用 v9 語法初始化
+        const app = initializeApp(firebaseConfig);
+        const db = getDatabase(app);
+
+        // 將重要函式掛載到 window，以便 HTML onclick 可以呼叫
+        window.showPage = showPage;
+        window.tryAdminLogin = tryAdminLogin;
+        window.resetSystem = resetSystem;
+        window.issueNextTicket = issueNextTicket;
+        window.initScreen = initScreen;
+        window.callNext = callNext;
+        window.recallCurrent = recallCurrent;
+        
+        // 頁面切換 (不變)
+        function showPage(pageId) {
+            document.querySelectorAll('.page').forEach(el => el.classList.remove('active-page'));
+            document.getElementById(pageId).classList.add('active-page');
+            window.scrollTo(0, 0); 
+        }
+
+        // 密碼檢查邏輯 (不變)
+        function tryAdminLogin() {
+            const password = prompt("請輸入系統後台管理密碼：");
+            if (password === "Bck54321") {
+                showPage('page-admin');
+            } else if (password !== null) {
+                alert("密碼錯誤，拒絕登入！");
+            }
+        }
+
+        // 後台邏輯與重置
+        function resetSystem() {
+            if(confirm("確定要將所有籌號與櫃位清零嗎？\n這將會重置所有老師及屏幕的畫面！")) {
+                const now = new Date();
+                const timeString = "已於 " + now.toLocaleTimeString('zh-HK', { hour12: true }) + " 成功重置";
+                
+                // 【修正】使用 v9 語法
+                const dbRef = ref(db, 'registration_day');
+                set(dbRef, {
+                    settings: { maxTickets: 125 },
+                    status: { 
+                        lastIssuedTicket: 0, 
+                        lastCalledTicket: 0,
+                        lastResetTime: timeString 
+                    },
+                    counters: {
+                        A: { currentTicket: "-", triggerAlert: 0 },
+                        B: { currentTicket: "-", triggerAlert: 0 },
+                        C: { currentTicket: "-", triggerAlert: 0 },
+                        D: { currentTicket: "-", triggerAlert: 0 }
+                    }
+                });
+            }
+        }
+
+        // 綜合監聽狀態
+        // 【修正】使用 v9 語法
+        const statusRef_onValue = ref(db, 'registration_day/status');
+        onValue(statusRef_onValue, (snapshot) => {
+            const data = snapshot.val();
+            if(data) {
+                const issued = data.lastIssuedTicket || 0;
+                const called = data.lastCalledTicket || 0;
+                
+                document.getElementById('current-issued-display').innerText = issued;
+                if(data.lastResetTime) {
+                    document.getElementById('admin-status').innerText = data.lastResetTime;
+                } else {
+                    document.getElementById('admin-status').innerText = "尚未有重置紀錄";
+                }
+
+                const waitingQueue = Math.max(0, issued - called);
+                const queueText = document.getElementById('queue-length-text');
+                const queueBar = document.getElementById('queue-length-bar');
+                
+                if(queueText && queueBar) {
+                    queueText.innerText = waitingQueue;
+                    
+                    const maxVisualQueue = 40; 
+                    const percent = Math.min(100, (waitingQueue / maxVisualQueue) * 100);
+                    queueBar.style.width = percent + '%';
+                    
+                    if(waitingQueue > 20) {
+                        queueBar.style.backgroundColor = "var(--danger-color)";
+                    } else if(waitingQueue > 10) {
+                        queueBar.style.backgroundColor = "#fd7e14";
+                    } else {
+                        queueBar.style.backgroundColor = "var(--primary-color)";
+                    }
+                }
+            }
+        });
+
+        // 派發下一籌
+        function issueNextTicket() {
+            // 【修正】使用 v9 語法
+            const statusRef = ref(db, 'registration_day/status');
+            get(statusRef).then((snapshot) => {
+                const data = snapshot.val();
+                if (data && data.lastIssuedTicket < 125) { 
+                    update(statusRef, { lastIssuedTicket: data.lastIssuedTicket + 1 });
+                } else { alert("注意：已經派發完所有 125 個籌號！"); }
+            });
+        }
+
+        // 屏幕邏輯
+        let screenInitialized = false;
+        let lastTriggerTimes = { A: 0, B: 0, C: 0, D: 0 };
+        const audio = document.getElementById('alert-sound');
+
+        function initScreen() {
+            audio.volume = 0;
+            audio.play().then(() => {
+                audio.pause(); audio.currentTime = 0; audio.volume = 1; 
+            }).catch(e => console.log("音效解鎖失敗", e));
+
+            document.getElementById('start-screen-btn').style.display = 'none';
+            document.getElementById('screen-display').style.display = 'block';
+            
+            if(!screenInitialized) {
+                // 【修正】使用 v9 語法
+                const countersRef = ref(db, 'registration_day/counters');
+                onValue(countersRef, (snapshot) => {
+                    const countersData = snapshot.val();
+                    if(!countersData) return;
+
+                    ['A', 'B', 'C', 'D'].forEach(counter => {
+                        const data = countersData[counter];
+                        const tdElement = document.getElementById(`screen-${counter}`);
+                        
+                        if(tdElement.innerText !== data.currentTicket.toString()) {
+                            tdElement.innerText = data.currentTicket;
+                        }
+
+                        if(data.triggerAlert > lastTriggerTimes[counter] && data.triggerAlert !== 0) {
+                            lastTriggerTimes[counter] = data.triggerAlert;
+                            triggerFlashAndSound(counter, data.currentTicket, tdElement);
+                        }
+                    });
+                });
+                screenInitialized = true;
+            }
+        }
+
+        async function playAzureTTS(text) {
+             if (!AZURE_TTS_API_KEY) return;
+            const url = `https://${AZURE_TTS_REGION}.tts.speech.microsoft.com/cognitiveservices/v1`;
+            const ssml = `<speak version='1.0' xml:lang='zh-HK'><voice xml:lang='zh-HK' name='zh-HK-HiuMaanNeural'>${text}</voice></speak>`;
+
+            try {
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: {
+                        'Ocp-Apim-Subscription-Key': AZURE_TTS_API_KEY,
+                        'Content-Type': 'application/ssml+xml',
+                        'X-Microsoft-OutputFormat': 'audio-16khz-128kbitrate-mono-mp3'
+                    },
+                    body: ssml
+                });
+
+                if (response.ok) {
+                    const blob = await response.blob();
+                    const audioUrl = URL.createObjectURL(blob);
+                    const aiAudio = new Audio(audioUrl);
+                    aiAudio.play();
+                }
+            } catch (error) {
+                console.error("語音播放失敗:", error);
+            }
+        }
+        
+        function triggerFlashAndSound(counterName, ticketNumber, element) {
+            audio.currentTime = 0;
+            audio.play().catch(e => console.log("音效被阻擋"));
+
+            setTimeout(() => {
+                const speakText = `請第${ticketNumber}號，到 ${counterName} 櫃位。`;
+                playAzureTTS(speakText);
+            }, 600); 
+
+            element.classList.remove('flashing');
+            void element.offsetWidth; // 觸發重繪
+            element.classList.add('flashing');
+            setTimeout(() => { element.classList.remove('flashing'); }, 3000);
+        }
+
+        // 櫃位邏輯
+        document.getElementById('counter-selector').addEventListener('change', updateCounterDisplay);
+        
+        function updateCounterDisplay() {
+            const selectedCounter = document.getElementById('counter-selector').value;
+            // 【修正】使用 v9 語法
+            const counterTicketRef = ref(db, `registration_day/counters/${selectedCounter}/currentTicket`);
+            get(counterTicketRef).then((snapshot) => {
+                document.getElementById('counter-current-display').innerText = snapshot.val() || "-";
+            });
+        }
+        updateCounterDisplay();
+
+        function callNext() {
+            const selectedCounter = document.getElementById('counter-selector').value;
+            // 【修正】使用 v9 Transaction 語法
+            const statusRef = ref(db, 'registration_day/status');
+            runTransaction(statusRef, (statusData) => {
+                if (statusData) {
+                    if (statusData.lastCalledTicket < statusData.lastIssuedTicket) {
+                        statusData.lastCalledTicket++;
+                        return statusData;
+                    }
+                }
+                return; // Abort transaction
+            }).then(result => {
+                if (!result.committed) {
+                     alert("目前等候區沒有新的籌號！");
+                } else {
+                    const newTicketNumber = result.snapshot.val().lastCalledTicket;
+                    const counterRef = ref(db, `registration_day/counters/${selectedCounter}`);
+                    set(counterRef, {
+                        currentTicket: newTicketNumber,
+                        triggerAlert: serverTimestamp()
+                    });
+                    document.getElementById('counter-current-display').innerText = newTicketNumber;
+                }
+            }).catch(error => {
+                console.log("Transaction failed!", error);
+            });
+        }
+
+        function recallCurrent() {
+            const selectedCounter = document.getElementById('counter-selector').value;
+            const currentDisplay = document.getElementById('counter-current-display').innerText;
+            if(currentDisplay === "-" || currentDisplay === "0") {
+                alert("請先呼叫下一位，才能使用再次廣播功能。"); return;
+            }
+            // 【修正】使用 v9 語法
+            const counterRef = ref(db, `registration_day/counters/${selectedCounter}`);
+            update(counterRef, {
+                triggerAlert: serverTimestamp()
+            });
+        }
+    </script>
     <style>
         /* ================= 美化版 CSS 設定 ================= */
         :root {
@@ -192,252 +454,5 @@
             <button class="btn-recall" onclick="recallCurrent()">🔄 再次廣播本號碼</button>
         </div>
     </div>
-
-    <script>
-        // Azure TTS 設定
-        const keyPart1 = "4e9H1rk28tibm8UfqdSG";
-        const keyPart2 = "0KTsw4qmzjoIq8hDryujrtej";
-        const keyPart3 = "FWtcINrCJQQJ99CFAC3pKaRXJ3w3AAAYACOGZiCb";
-        
-        const AZURE_TTS_API_KEY = keyPart1 + keyPart2 + keyPart3;
-        const AZURE_TTS_REGION = "eastasia";
-
-        // Firebase 初始化設定
-        const firebaseConfig = {
-            apiKey: "AIzaSyAFKv3zV4rdCK-luw6Z506jzrlezk4s3rg",
-            authDomain: "q-ticketing-system.firebaseapp.com",
-            databaseURL: "https://q-ticketing-system-default-rtdb.asia-southeast1.firebasedatabase.app",
-            projectId: "q-ticketing-system",
-            storageBucket: "q-ticketing-system.firebasestorage.app",
-            messagingSenderId: "1008195336427",
-            appId: "1:1008195336427:web:d242c7b2c2cc5ff4d7e6ae"
-        };
-        
-        if (!firebase.apps.length) { firebase.initializeApp(firebaseConfig); }
-        const db = firebase.database();
-
-        // 頁面切換
-        function showPage(pageId) {
-            document.querySelectorAll('.page').forEach(el => el.classList.remove('active-page'));
-            document.getElementById(pageId).classList.add('active-page');
-            window.scrollTo(0, 0); 
-        }
-
-        // 密碼檢查邏輯
-        function tryAdminLogin() {
-            const password = prompt("請輸入系統後台管理密碼：");
-            if (password === "Bck54321") {
-                showPage('page-admin');
-            } else if (password !== null) {
-                alert("密碼錯誤，拒絕登入！");
-            }
-        }
-
-        // 後台邏輯與重置
-        function resetSystem() {
-            if(confirm("確定要將所有籌號與櫃位清零嗎？\n這將會重置所有老師及屏幕的畫面！")) {
-                const now = new Date();
-                const timeString = "已於 " + now.toLocaleTimeString('zh-HK', { hour12: true }) + " 成功重置";
-                
-                db.ref('registration_day').set({
-                    settings: { maxTickets: 125 },
-                    status: { 
-                        lastIssuedTicket: 0, 
-                        lastCalledTicket: 0,
-                        lastResetTime: timeString 
-                    },
-                    counters: {
-                        A: { currentTicket: "-", triggerAlert: 0 },
-                        B: { currentTicket: "-", triggerAlert: 0 },
-                        C: { currentTicket: "-", triggerAlert: 0 },
-                        D: { currentTicket: "-", triggerAlert: 0 }
-                    }
-                });
-            }
-        }
-
-        // ==========================================
-        // 【修改 1.9】 綜合監聽狀態：同時更新派籌數量及等候人數長度棒
-        // ==========================================
-        db.ref('registration_day/status').on('value', (snapshot) => {
-            const data = snapshot.val();
-            if(data) {
-                const issued = data.lastIssuedTicket || 0;
-                const called = data.lastCalledTicket || 0;
-                
-                // 1. 更新 201派籌區 及 後台的最後重置時間
-                document.getElementById('current-issued-display').innerText = issued;
-                if(data.lastResetTime) {
-                    document.getElementById('admin-status').innerText = data.lastResetTime;
-                } else {
-                    document.getElementById('admin-status').innerText = "尚未有重置紀錄";
-                }
-
-                // 2. 更新 202櫃位區 的等候人數及視線長度棒
-                // 計算等候人數 (不會是負數)
-                const waitingQueue = Math.max(0, issued - called);
-                const queueText = document.getElementById('queue-length-text');
-                const queueBar = document.getElementById('queue-length-bar');
-                
-                if(queueText && queueBar) {
-                    queueText.innerText = waitingQueue;
-                    
-                    // 設定視覺上限 (例如 40 人等候時進度棒為 100% 滿)
-                    const maxVisualQueue = 40; 
-                    const percent = Math.min(100, (waitingQueue / maxVisualQueue) * 100);
-                    queueBar.style.width = percent + '%';
-                    
-                    // 動態轉換顏色作視覺提示
-                    if(waitingQueue > 20) {
-                        queueBar.style.backgroundColor = "var(--danger-color)"; // 人多：紅色
-                    } else if(waitingQueue > 10) {
-                        queueBar.style.backgroundColor = "#fd7e14"; // 中等：橙色
-                    } else {
-                        queueBar.style.backgroundColor = "var(--primary-color)"; // 正常：深藍色
-                    }
-                }
-            }
-        });
-
-        // 派發下一籌
-        function issueNextTicket() {
-            const statusRef = db.ref('registration_day/status');
-            statusRef.once('value').then((snapshot) => {
-                const data = snapshot.val();
-                if (data && data.lastIssuedTicket < 125) { 
-                    statusRef.update({ lastIssuedTicket: data.lastIssuedTicket + 1 });
-                } else { alert("注意：已經派發完所有 125 個籌號！"); }
-            });
-        }
-
-        // 屏幕邏輯
-        let screenInitialized = false;
-        let lastTriggerTimes = { A: 0, B: 0, C: 0, D: 0 };
-
-        function initScreen() {
-            const audio = document.getElementById('alert-sound');
-            audio.volume = 0;
-            audio.play().then(() => {
-                audio.pause(); audio.currentTime = 0; audio.volume = 1; 
-            }).catch(e => console.log("音效解鎖失敗", e));
-
-            document.getElementById('start-screen-btn').style.display = 'none';
-            document.getElementById('screen-display').style.display = 'block';
-            
-            if(!screenInitialized) {
-                db.ref('registration_day/counters').on('value', (snapshot) => {
-                    const countersData = snapshot.val();
-                    if(!countersData) return;
-
-                    ['A', 'B', 'C', 'D'].forEach(counter => {
-                        const data = countersData[counter];
-                        const tdElement = document.getElementById(`screen-${counter}`);
-                        
-                        if(tdElement.innerText !== data.currentTicket.toString()) {
-                            tdElement.innerText = data.currentTicket;
-                        }
-
-                        if(data.triggerAlert > lastTriggerTimes[counter] && data.triggerAlert !== 0) {
-                            lastTriggerTimes[counter] = data.triggerAlert;
-                            triggerFlashAndSound(counter, data.currentTicket, tdElement);
-                        }
-                    });
-                });
-                screenInitialized = true;
-            }
-        }
-
-        async function playAzureTTS(text) {
-            if (!AZURE_TTS_API_KEY) return;
-            const url = `https://${AZURE_TTS_REGION}.tts.speech.microsoft.com/cognitiveservices/v1`;
-            const ssml = `<speak version='1.0' xml:lang='zh-HK'><voice xml:lang='zh-HK' name='zh-HK-HiuMaanNeural'>${text}</voice></speak>`;
-
-            try {
-                const response = await fetch(url, {
-                    method: 'POST',
-                    headers: {
-                        'Ocp-Apim-Subscription-Key': AZURE_TTS_API_KEY,
-                        'Content-Type': 'application/ssml+xml',
-                        'X-Microsoft-OutputFormat': 'audio-16khz-128kbitrate-mono-mp3'
-                    },
-                    body: ssml
-                });
-
-                if (response.ok) {
-                    const blob = await response.blob();
-                    const audioUrl = URL.createObjectURL(blob);
-                    const aiAudio = new Audio(audioUrl);
-                    aiAudio.play();
-                }
-            } catch (error) {
-                console.error("語音播放失敗:", error);
-            }
-        }
-
-        function triggerFlashAndSound(counterName, ticketNumber, element) {
-            const audio = document.getElementById('alert-sound');
-            audio.currentTime = 0;
-            audio.play().catch(e => console.log("音效被阻擋"));
-
-            setTimeout(() => {
-                const speakText = `請第${ticketNumber}號，到 ${counterName} 櫃位。`;
-                playAzureTTS(speakText);
-            }, 600); 
-
-            element.classList.remove('flashing');
-            void element.offsetWidth; // 觸發重繪
-            element.classList.add('flashing');
-            setTimeout(() => { element.classList.remove('flashing'); }, 3000);
-        }
-
-        // 櫃位邏輯
-        document.getElementById('counter-selector').addEventListener('change', updateCounterDisplay);
-        
-        function updateCounterDisplay() {
-            const selectedCounter = document.getElementById('counter-selector').value;
-            db.ref(`registration_day/counters/${selectedCounter}/currentTicket`).once('value', (snapshot) => {
-                document.getElementById('counter-current-display').innerText = snapshot.val() || "-";
-            });
-        }
-        updateCounterDisplay();
-
-        function callNext() {
-            const selectedCounter = document.getElementById('counter-selector').value;
-            const statusRef = db.ref('registration_day/status');
-            
-            statusRef.transaction((statusData) => {
-                if (statusData) {
-                    if (statusData.lastCalledTicket < statusData.lastIssuedTicket) {
-                        statusData.lastCalledTicket++;
-                    } else { return; }
-                }
-                return statusData;
-            }, (error, committed, snapshot) => {
-                if (error) {
-                    console.log("Transaction failed!", error);
-                } else if (!committed) {
-                    alert("目前等候區沒有新的籌號！");
-                } else {
-                    const newTicketNumber = snapshot.val().lastCalledTicket;
-                    db.ref(`registration_day/counters/${selectedCounter}`).set({
-                        currentTicket: newTicketNumber,
-                        triggerAlert: firebase.database.ServerValue.TIMESTAMP
-                    });
-                    document.getElementById('counter-current-display').innerText = newTicketNumber;
-                }
-            });
-        }
-
-        function recallCurrent() {
-            const selectedCounter = document.getElementById('counter-selector').value;
-            const currentDisplay = document.getElementById('counter-current-display').innerText;
-            if(currentDisplay === "-" || currentDisplay === "0") {
-                alert("請先呼叫下一位，才能使用再次廣播功能。"); return;
-            }
-            db.ref(`registration_day/counters/${selectedCounter}`).update({
-                triggerAlert: firebase.database.ServerValue.TIMESTAMP
-            });
-        }
-    </script>
 </body>
 </html>
